@@ -1,0 +1,7 @@
+#!/usr/bin/env python
+
+from nicegui import native, ui
+
+from piradioctl import main_page
+
+ui.run(main_page, reload=False, native=True, port=native.find_open_port())
