@@ -8,7 +8,7 @@ def define_styles():
     <style type="text/tailwindcss">
       @layer components {
         .piradio-label {
-          @apply font-bold;
+          @apply font-bold object-center;
         }
 
         .piradio-page-title {
@@ -33,7 +33,7 @@ def define_styles():
     </style>
     ''')
 
-
+    
 class GUI(metaclass=Singleton):
     def __init__(self):
         self.devices = []
@@ -55,12 +55,14 @@ class GUI(metaclass=Singleton):
             ui.button("Add Octo LO", on_click=self.add_octo_lo)
             ui.button("Add Unconfigured", on_click=self.add_unconfigured)
 
-    def add_tab(self): 
+    def add_tab(self):
+        title = f"{len(self.devices)}"
+        
         with self.tabs:
-            tab = ui.tab("---")
+            tab = ui.tab(f"{len(self.devices)}")
             
         with self.tab_panels:
-            panel = ui.tab_panel('---')
+            panel = ui.tab_panel(f"{len(self.devices)}")
 
         return tab, panel
             
@@ -72,6 +74,8 @@ class GUI(metaclass=Singleton):
         self.devices += [ device ]
 
         await device.create()
+
+        self.tabs.set_value(tab)
 
     async def add_octo_lo(self):
         pass
