@@ -1,7 +1,12 @@
+import sys
+
 from nicegui import ui
 
+print(sys.path)
+
+from piradiousb import Singleton, DeviceList
+
 from .fr3_1ch import FR3SingleChannel
-from .singleton import Singleton
 
 def define_styles():
     ui.add_head_html('''
@@ -37,6 +42,8 @@ def define_styles():
 class GUI(metaclass=Singleton):
     def __init__(self):
         self.devices = []
+
+        self.dev_list = DeviceList()
         
     async def create(self):
         define_styles()
@@ -45,7 +52,7 @@ class GUI(metaclass=Singleton):
         self.tab_panels = ui.tab_panels(self.tabs)
         
         with self.tabs:
-            ui.tab("Devices")
+            self.device_tab = ui.tab("Devices")
 
         with self.tab_panels:
             self.devices_panel = ui.tab_panel('Devices')
@@ -54,6 +61,8 @@ class GUI(metaclass=Singleton):
             ui.button("Add Single Channel", on_click=self.add_single_channel)
             ui.button("Add Octo LO", on_click=self.add_octo_lo)
             ui.button("Add Unconfigured", on_click=self.add_unconfigured)
+
+        self.tabs.set_value(self.device_tab)
 
     def add_tab(self):
         title = f"{len(self.devices)}"

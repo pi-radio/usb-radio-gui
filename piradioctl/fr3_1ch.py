@@ -342,7 +342,7 @@ class FR3SingleChannel:
         self._in_freq.value = 2
         self._lo_freq.value = 8
         self._in_power.value = -20
-        self._carrier_freq.value = 6
+        self._carrier_freq.value = 10
         self._bandwidth.value = 1
 
         self._running = True
