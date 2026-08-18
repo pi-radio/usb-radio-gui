@@ -88,6 +88,7 @@ class GUI(metaclass=Singleton):
 
     async def add_octo_lo(self):
         tab, panel = self.add_tab()
+        
         device = OctoLO(tab, panel)
 
         self.devices += [ device ]
@@ -95,7 +96,6 @@ class GUI(metaclass=Singleton):
         await device.create()
 
         self.tabs.set_value(tab)
-        pass
 
     async def add_unconfigured(self):
         pass
