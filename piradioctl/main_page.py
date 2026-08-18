@@ -7,7 +7,7 @@ print(sys.path)
 from piradiousb import Singleton, DeviceList
 
 from .fr3_1ch import FR3SingleChannel
-
+from .octo_lo import OctoLO
 def define_styles():
     ui.add_head_html('''
     <style type="text/tailwindcss">
@@ -87,6 +87,14 @@ class GUI(metaclass=Singleton):
         self.tabs.set_value(tab)
 
     async def add_octo_lo(self):
+        tab, panel = self.add_tab()
+        device = OctoLO(tab, panel)
+
+        self.devices += [ device ]
+
+        await device.create()
+
+        self.tabs.set_value(tab)
         pass
 
     async def add_unconfigured(self):
