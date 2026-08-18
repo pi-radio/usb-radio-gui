@@ -58,6 +58,14 @@ class GUI(metaclass=Singleton):
             self.devices_panel = ui.tab_panel('Devices')
 
         with self.devices_panel:
+            import piradio
+
+            dl = piradio.DeviceList()
+
+            items = { i: f"{dev.tty}: {dev.model} {dev.serial}" for i, dev in enumerate(dl.get_devices()) }
+
+            ui.select(options=items)
+            
             ui.button("Add Single Channel", on_click=self.add_single_channel)
             ui.button("Add Octo LO", on_click=self.add_octo_lo)
             ui.button("Add Unconfigured", on_click=self.add_unconfigured)
