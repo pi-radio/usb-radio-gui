@@ -174,6 +174,7 @@ class FR3SingleChannel:
         self.tab = tab
         self.panel = panel
         self._running = False
+       
 
     @property
     def running(self):
@@ -181,7 +182,6 @@ class FR3SingleChannel:
         
     def create_input_card(self):
         pititle("Input Signal")
-        
         self._in_freq = ValuePanel("Input Center Frequency", "GHz", 0.4, 4, self.on_in_freq_change)
         self._in_power = ValuePanel("Total Input Power", "dBm", -60, -5, self.on_power_change)
         self._bandwidth = ValuePanel("Bandwidth", "GHz", 0, 1, self.on_bandwidth_change)
@@ -209,22 +209,47 @@ class FR3SingleChannel:
         self.filter_slider.props("dense borderless")
         
         self.filter_select = ui.select(select_labels, value=0x30, on_change=self.on_filter_change)
-        
+    def create_IQ(self):
+        pititle("IQ Bias")
+        self._I_Bias = ValuePanel("I bias", "V", -0.4,0.4, self.on_I_change)
+        self._Q_Bias = ValuePanel("Q bias", "V", -0.4,0.4, self.on_Q_change)
+    def create_clockfreq(self):
+        pititle("Clock Freqency")
+        self._Clk_freq = ValuePanel("Clock Freq", "MHz", 0,400, self.on_Clk_change)
+    def create_lo_sel(self):
+        pititle("External clock")
+        checkboxclk = ui.switch(on_change=lambda e: self.on_clksel_change(checkboxclk.value))
+        pititle("External LO")
+        checkboxlo = ui.switch(on_change=lambda e: self.on_losel_change(checkboxlo.value))
     def create_frequency_panels(self):
-        with ui.grid(columns=2):
-            with ui.column():
-                with ui.card():
-                    self.create_input_card()
-                    
-                with ui.card():
-                    self.create_conversion_card()
+        with ui.tabs() as lo_tabs:
+            lostuff = ui.tab('lostuff')
+            lostuff2 = ui.tab('lostuff2')
 
-                with ui.card():
-                    self.create_filter_card()
+        with ui.tab_panels(lo_tabs, value=lostuff).classes('w-full'):
+            with ui.tab_panel(lostuff):
+                ui.label('')
+                with ui.grid(columns=2):
+                    with ui.column():
+                        with ui.card():
+                            self.create_input_card()
                     
-            with ui.card():
-                self.freq_plan_plot = FrequencyPlanPlot(self)
+                        with ui.card():
+                            self.create_conversion_card()
 
+                        with ui.card():
+                            self.create_filter_card()
+                    
+                    with ui.card():
+                        self.freq_plan_plot = FrequencyPlanPlot(self)
+            with ui.tab_panel(lostuff2):
+                ui.label('')
+                with ui.grid(columns=2):
+                    with ui.column():
+                        with ui.card():
+                            self.create_IQ()   
+                            self.create_lo_sel()
+                            self.create_clockfreq()
     @property
     def sideband(self):
         return self._output_sideband.value
@@ -278,6 +303,9 @@ class FR3SingleChannel:
         self._in_power.value = -20
         self._carrier_freq.value = 10
         self._bandwidth.value = 1
+        self._I_Bias.value = 0
+        self._Q_Bias.value = 0
+        self._Clk_freq.value = 20
 
         self._running = True
 
@@ -337,3 +365,21 @@ class FR3SingleChannel:
             
         self.freq_plan_plot.update()
         
+    async def on_I_change(self, f):
+        print(self._I_Bias.value)
+
+    async def on_Q_change(self, f):
+        print(self._Q_Bias.value)
+    async def on_losel_change(self, f):
+        if f == True:
+            print("External clock")
+        else:
+            print("Internal clock")
+    async def on_clksel_change(self, f):
+        if f == True:
+            print("External LO")
+        else:
+            print("Internal LO")
+        
+    async def on_Clk_change(self, f):
+        print(self._Clk_freq.value)
