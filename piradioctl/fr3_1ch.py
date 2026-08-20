@@ -170,11 +170,14 @@ class FrequencyPlanPlot:
         self.plotly.update()
             
 class FR3SingleChannel:
-    def __init__(self, tab, panel):
+    def __init__(self, radio, tab, panel):
+        self.radio = radio
         self.tab = tab
         self.panel = panel
         self._running = False
-       
+
+        self.input_frequency = 2
+        self.carrier_frequency = 10
 
     @property
     def running(self):
@@ -182,17 +185,17 @@ class FR3SingleChannel:
         
     def create_input_card(self):
         pititle("Input Signal")
-        self._in_freq = ValuePanel("Input Center Frequency", "GHz", 0.4, 4, self.on_in_freq_change)
-        self._in_power = ValuePanel("Total Input Power", "dBm", -60, -5, self.on_power_change)
-        self._bandwidth = ValuePanel("Bandwidth", "GHz", 0, 1, self.on_bandwidth_change)
+        self._in_freq = ValuePanel("Input Center Frequency", "GHz", 0.4, 4, self.on_in_freq_change, self.input_frequency)
+        self._in_power = ValuePanel("Total Input Power", "dBm", -60, -5, self.on_power_change, -20)
+        self._bandwidth = ValuePanel("Bandwidth", "GHz", 0, 1, self.on_bandwidth_change, 0.1)
 
-    def create_conversion_card(self):
+    async def create_conversion_card(self):
         pititle("Frequency Conversion")
 
         self._output_sideband = ui.toggle(["LSB", "USB"], value="USB", on_change=self.on_sideband_change)
         
-        self._lo_freq = ValuePanel("LO", "GHz", 4, 24, self.on_lo_freq_change)
-        self._carrier_freq = ValuePanel("Output Center Frequency", "GHZ", 6, 24, self.on_carrier_freq_change)
+        self._lo_freq = ValuePanel("LO", "GHz", 4, 24, self.on_lo_freq_change, value=self.radio.LO / 1e9)
+        self._carrier_freq = ValuePanel("Output Center Frequency", "GHZ", 6, 24, self.on_carrier_freq_change, 6)
 
     def create_filter_card(self):
         pititle("Filtering")
@@ -211,17 +214,17 @@ class FR3SingleChannel:
         self.filter_select = ui.select(select_labels, value=0x30, on_change=self.on_filter_change)
     def create_IQ(self):
         pititle("IQ Bias")
-        self._I_Bias = ValuePanel("I bias", "V", -0.4,0.4, self.on_I_change)
-        self._Q_Bias = ValuePanel("Q bias", "V", -0.4,0.4, self.on_Q_change)
+        self._I_Bias = ValuePanel("I bias", "V", -0.4,0.4, self.on_I_change, self.radio.I_V)
+        self._Q_Bias = ValuePanel("Q bias", "V", -0.4,0.4, self.on_Q_change, self.radio.Q_V)
     def create_clockfreq(self):
         pititle("Clock Freqency")
-        self._Clk_freq = ValuePanel("Clock Freq", "MHz", 0,400, self.on_Clk_change)
+        self._Clk_freq = ValuePanel("Clock Freq", "MHz", 0,400, self.on_Clk_change, 100)
     def create_lo_sel(self):
         pititle("External clock")
         checkboxclk = ui.switch(on_change=lambda e: self.on_clksel_change(checkboxclk.value))
         pititle("External LO")
         checkboxlo = ui.switch(on_change=lambda e: self.on_losel_change(checkboxlo.value))
-    def create_frequency_panels(self):
+    async def create_frequency_panels(self):
         with ui.tabs() as lo_tabs:
             lostuff = ui.tab('lostuff')
             lostuff2 = ui.tab('lostuff2')
@@ -235,13 +238,20 @@ class FR3SingleChannel:
                             self.create_input_card()
                     
                         with ui.card():
-                            self.create_conversion_card()
+                            await self.create_conversion_card()
 
                         with ui.card():
                             self.create_filter_card()
                     
                     with ui.card():
                         self.freq_plan_plot = FrequencyPlanPlot(self)
+
+                if self.sideband == "USB":
+                    self._carrier_freq.value = self.radio.LO + self.input_frequency
+                else:
+                    self._carrier_freq.value = self.radio.LO - self.input_frequency
+            
+                        
             with ui.tab_panel(lostuff2):
                 ui.label('')
                 with ui.grid(columns=2):
@@ -250,6 +260,8 @@ class FR3SingleChannel:
                             self.create_IQ()   
                             self.create_lo_sel()
                             self.create_clockfreq()
+
+            
     @property
     def sideband(self):
         return self._output_sideband.value
@@ -291,12 +303,28 @@ class FR3SingleChannel:
             return self.lo_freq - self.input_signal
         else:
             return self.lo_freq + self.input_signal
+
         
+        
+    @property
+    def lo_frequency(self):
+        try:
+            return self.radio.LO / 1e9
+        except Exception as e:
+            print(f"Failed to get lo: {e}")
+        
+    @lo_frequency.setter
+    def lo_frequency(self, f):
+        try:
+            self.radio.LO = f * 1e9
+            self._lo_freq.value = f
+        except Exception as e:
+            print(f"Failed to set lo: {e}")
         
     async def create(self):
         with self.panel:
             with ui.row():
-                self.create_frequency_panels()
+                await self.create_frequency_panels()
 
         self._in_freq.value = 2
         self._lo_freq.value = 8
@@ -312,10 +340,12 @@ class FR3SingleChannel:
         self.freq_plan_plot.update()
                 
     async def on_in_freq_change(self, f):
+        self.input_frequency = f
+        
         if self.sideband == "USB":
-            self._lo_freq.value = self._carrier_freq.value - f
+            self.lo_frequency = self._carrier_freq.value - f
         else:
-            self._lo_freq.value = self._carrier_freq.value + f
+            self.lo_frequency = self._carrier_freq.value + f
             
         self.freq_plan_plot.update()
         
@@ -323,6 +353,8 @@ class FR3SingleChannel:
         self.freq_plan_plot.update()
             
     async def on_lo_freq_change(self, f):
+        self.lo_frequency = f 
+        
         if self.sideband == "USB":
             self._carrier_freq.value = f + self._in_freq.value
         else:
@@ -331,10 +363,12 @@ class FR3SingleChannel:
         self.freq_plan_plot.update()
 
     async def on_carrier_freq_change(self, f):
+        self.carrier_frequency = f
+        
         if self.sideband == "USB":
-            self._lo_freq.value = f - self._in_freq.value
+            self.lo_frequency = f - self._in_freq.value
         else:
-            self._lo_freq.value = f + self._in_freq.value
+            self.lo_frequency = f + self._in_freq.value
 
         self.freq_plan_plot.update()
 

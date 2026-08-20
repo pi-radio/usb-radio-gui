@@ -8,6 +8,7 @@ from piradiousb import Singleton, DeviceList
 
 from .fr3_1ch import FR3SingleChannel
 from .octo_lo import OctoLO
+
 def define_styles():
     ui.add_head_html('''
     <style type="text/tailwindcss">
@@ -38,15 +39,40 @@ def define_styles():
     </style>
     ''')
 
-    
+class RadioButton(ui.button):
+    def __init__(self, gui, dev_entry, *args, **kwargs):
+        self._gui = gui
+        self._open = False
+        self._dev_entry = dev_entry
+        super().__init__(f'{dev_entry.model}: {dev_entry.serial}', *args, **kwargs)
+        self.on('click', self.toggle)
+
+    async def toggle(self):
+        if self._open:
+            await self._gui.delete_tab(self._dev_entry)
+            self._open = False
+        else:
+            await self._gui.open_tab(self._dev_entry)
+            self._open = True
+            
+        self.update()
+
+    def update(self):
+        with self.props.suspend_updates():
+            self.props(f'color={"green" if self._open else "blue"}')
+            super().update()
+        
 class GUI(metaclass=Singleton):
     def __init__(self):
-        self.devices = []
+        self.devices = {}
 
         self.dev_list = DeviceList()
         
     async def create(self):
         define_styles()
+
+        self.radio_tabs = {}
+        self.radio_tab_panels = {}
         
         self.tabs = ui.tabs()
         self.tab_panels = ui.tab_panels(self.tabs)
@@ -60,11 +86,12 @@ class GUI(metaclass=Singleton):
         with self.devices_panel:
             import piradio
 
-            dl = piradio.DeviceList()
+            self.device_list = piradio.DeviceList()
 
-            items = { i: f"{dev.tty}: {dev.model} {dev.serial}" for i, dev in enumerate(dl.get_devices()) }
-
-            ui.select(options=items)
+            self.radio_buttons = {}
+            
+            for dev in self.device_list.get_devices():
+                self.radio_buttons[dev.tty] = RadioButton(self, dev)
             
             ui.button("Add Single Channel", on_click=self.add_single_channel)
             ui.button("Add Octo LO", on_click=self.add_octo_lo)
@@ -72,23 +99,55 @@ class GUI(metaclass=Singleton):
 
         self.tabs.set_value(self.device_tab)
 
-    def add_tab(self):
-        title = f"{len(self.devices)}"
+    def add_tab(self, dev_entry):
+        title = f"{dev_entry.model} {dev_entry.serial}"
         
         with self.tabs:
-            tab = ui.tab(f"{len(self.devices)}")
+            tab = ui.tab(title)
             
         with self.tab_panels:
-            panel = ui.tab_panel(f"{len(self.devices)}")
+            panel = ui.tab_panel(title)
 
         return tab, panel
+
+    async def open_tab(self, dev_entry):
+        radio = self.device_list.get_device(dev_entry.tty)
+
+        radio.connect()
+        
+        tab, panel = self.add_tab(dev_entry)
+
+        if dev_entry.model == "FR3_1CH":
+            device = FR3SingleChannel(radio, tab, panel)
+
+            self.devices[dev_entry.tty] = device
+
+        await device.create()
+
+        self.tabs.set_value(tab)
+    
+    def delete_tab(self, dev_entry):
+        self.tabs.remove(f"{dev_entry.model} {dev_entry.serial}")
+        
             
     async def add_single_channel(self):
-        tab, panel = self.add_tab()
-        
-        device = FR3SingleChannel(tab, panel)
+        class MockSingleChannel:
+            def __init__(self, gui):
+                self.tty = len(gui.devices)
+                self.model = "Mock FR3 1CH"
+                self.serial = f"{len(gui.devices)}"
+                
+                self.LO = 10e9
+                self.I_V = 0.1
+                self.Q_V = -0.1
 
-        self.devices += [ device ]
+        radio = MockSingleChannel()
+                
+        tab, panel = self.add_tab(radio)
+                
+        device = FR3SingleChannel(radio, tab, panel)
+
+        self.devices[radio.tty] = device
 
         await device.create()
 
